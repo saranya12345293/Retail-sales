@@ -1,0 +1,198 @@
+1. Preview the data
+SELECT * FROM sales LIMIT 10;
+
+2. Count total rows
+SELECT COUNT(*) AS total_rows FROM sales;
+
+3. Key Performance Indicators (KPIs)
+-- Total revenue
+SELECT SUM(total_sale) AS total_revenue FROM sales;
+
+-- Average order value
+SELECT AVG(total_sale) AS avg_order_value FROM sales;
+
+-- Total unique customers
+SELECT COUNT(DISTINCT customer_id) AS total_customers FROM sales;
+
+4. Data quality check
+SELECT
+  SUM(CASE WHEN quantity IS NULL OR quantity <= 0 THEN 1 ELSE 0 END) AS bad_qty,
+  SUM(CASE WHEN price_per_unit IS NULL OR price_per_unit <= 0 THEN 1 ELSE 0 END) AS bad_price
+FROM sales;
+
+5. Sales by category
+SELECT category, SUM(total_sale) AS total_sales
+FROM sales
+GROUP BY category
+ORDER BY total_sales DESC;
+
+6. Monthly sales trend
+SELECT strftime('%Y-%m', sale_date) AS month, SUM(total_sale) AS monthly_sales
+FROM sales
+GROUP BY month
+ORDER BY month;
+
+7. Top 5 customers
+SELECT customer_id, SUM(total_sale) AS total_spent
+FROM sales
+GROUP BY customer_id
+ORDER BY total_spent DESC
+LIMIT 5;
+
+8. Profit by category
+SELECT category, SUM(total_sale - cogs) AS profit
+FROM sales
+GROUP BY category
+ORDER BY profit DESC;
+
+9. Rank categories by sales
+SELECT category,
+       SUM(total_sale) AS total_sales,
+       RANK() OVER (ORDER BY SUM(total_sale) DESC) AS sales_rank
+FROM sales
+GROUP BY category;
+
+10. Year-over-year growth
+WITH yearly AS (
+  SELECT strftime('%Y', sale_date) AS year, SUM(total_sale) AS total_sales
+  FROM sales
+  GROUP BY year
+)
+SELECT year,
+       total_sales,
+       LAG(total_sales) OVER (ORDER BY year) AS prev_year,
+       ROUND((total_sales - LAG(total_sales) OVER (ORDER BY year)) * 100.0 /
+             NULLIF(LAG(total_sales) OVER (ORDER BY year), 0), 2) AS yoy_growth_pct
+FROM yearly;
+2. Data Cleaning Queries
+-- 1. Remove rows with invalid quantity or price
+DELETE FROM sales
+WHERE quantity <= 0 OR price_per_unit <= 0;
+
+-- 2. Fill missing COGS with estimated value (price * quantity * 0.7 as example)
+UPDATE sales
+SET cogs = price_per_unit * quantity * 0.7
+WHERE cogs IS NULL;
+
+-- 3. Standardize category names (example: fix typos)
+UPDATE sales
+SET category = TRIM(LOWER(category));
+
+-- 4. Remove duplicate transactions
+DELETE FROM sales
+WHERE rowid NOT IN (
+    SELECT MIN(rowid)
+    FROM sales
+    GROUP BY transactions_id
+);
+
+-- 5. Ensure dates are in correct format
+UPDATE sales
+SET sale_date = date(sale_date);
+
+3. Exploratory Data Analysis (EDA) Queries
+-- 1. Total sales by category
+SELECT category, SUM(total_sale) AS total_sales
+FROM sales
+GROUP BY category
+ORDER BY total_sales DESC;
+
+-- 2. Sales by gender
+SELECT gender, SUM(total_sale) AS total_sales
+FROM sales
+GROUP BY gender
+ORDER BY total_sales DESC;
+
+-- 3. Age group sales
+SELECT CASE
+         WHEN age < 20 THEN 'Under 20'
+         WHEN age BETWEEN 20 AND 29 THEN '20-29'
+         WHEN age BETWEEN 30 AND 39 THEN '30-39'
+         WHEN age BETWEEN 40 AND 49 THEN '40-49'
+         ELSE '50+'
+       END AS age_group,
+       SUM(total_sale) AS total_sales
+FROM sales
+GROUP BY age_group
+ORDER BY total_sales DESC;
+
+-- 4. Monthly sales trend
+SELECT strftime('%Y-%m', sale_date) AS month, SUM(total_sale) AS monthly_sales
+FROM sales
+GROUP BY month
+ORDER BY month;
+
+-- 5. Top 10 customers by spend
+SELECT customer_id, SUM(total_sale) AS total_spent
+FROM sales
+GROUP BY customer_id
+ORDER BY total_spent DESC
+LIMIT 10;
+
+-- 6. Peak sales hours
+SELECT strftime('%H', sale_time) AS hour, SUM(total_sale) AS sales
+FROM sales
+GROUP BY hour
+ORDER BY sales DESC;
+
+-- 7. Average quantity per transaction by category
+SELECT category, AVG(quantity) AS avg_quantity
+FROM sales
+GROUP BY category;
+
+Advanced Analysis 
+------------------------------------------------------------
+-- 8. Profit by category
+------------------------------------------------------------
+SELECT category, 
+       SUM(total_sale - cogs) AS profit
+FROM sales
+GROUP BY category
+ORDER BY profit DESC;
+
+------------------------------------------------------------
+-- 9. Rank categories by total sales
+------------------------------------------------------------
+SELECT category,
+       SUM(total_sale) AS total_sales,
+       RANK() OVER (ORDER BY SUM(total_sale) DESC) AS sales_rank
+FROM sales
+GROUP BY category;
+
+------------------------------------------------------------
+-- 10. Year-over-year sales growth
+------------------------------------------------------------
+WITH yearly AS (
+  SELECT strftime('%Y', sale_date) AS year,
+         SUM(total_sale) AS total_sales
+  FROM sales
+  GROUP BY year
+)
+SELECT year,
+       total_sales,
+       LAG(total_sales) OVER (ORDER BY year) AS prev_year,
+       ROUND(
+         (total_sales - LAG(total_sales) OVER (ORDER BY year)) * 100.0 /
+         NULLIF(LAG(total_sales) OVER (ORDER BY year), 0),
+         2
+       ) AS yoy_growth_pct
+FROM yearly;
+
+------------------------------------------------------------
+-- 11. Top 10 customers by total spend
+------------------------------------------------------------
+SELECT customer_id,
+       SUM(total_sale) AS total_spent
+FROM sales
+GROUP BY customer_id
+ORDER BY total_spent DESC
+LIMIT 10;
+
+------------------------------------------------------------
+-- 12. Average profit margin per category
+------------------------------------------------------------
+SELECT category,
+       ROUND(AVG((total_sale - cogs) * 100.0 / total_sale), 2) AS avg_margin_pct
+FROM sales
+GROUP BY category
+ORDER BY avg_margin_pct DESC;
